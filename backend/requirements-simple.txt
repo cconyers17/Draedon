@@ -1,0 +1,17 @@
+# Minimal requirements for Render deployment
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Basic dependencies that compile easily
+numpy>=1.24.0
+requests>=2.31.0
+aiofiles>=23.0.0
+
+# Simple file processing
+trimesh>=4.0.0
+numpy-stl>=3.0.0
+
+# Development tools
+pytest>=7.0.0
+black>=23.0.0

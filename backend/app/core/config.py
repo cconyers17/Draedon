@@ -4,13 +4,14 @@ Handles environment variables and configuration management.
 """
 
 from typing import Optional, List, Any, Dict
-from pydantic_settings import BaseSettings
-from pydantic import PostgresDsn, RedisDsn, validator, Field
+# from pydantic_settings import BaseSettings
+# from pydantic import PostgresDsn, RedisDsn, validator, Field
 import secrets
+import os
 from pathlib import Path
 
 
-class Settings(BaseSettings):
+class Settings:
     # API Configuration
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "Text-to-CAD API"

@@ -5,7 +5,7 @@
 1. **Go to GitHub**: Visit https://github.com
 2. **Create New Repository**:
    - Click the "+" icon → "New repository"
-   - Repository name: `text-to-cad-architecture`
+   - Repository name: `Draedon`
    - Description: "Professional text-to-CAD architecture application with Next.js frontend and FastAPI backend"
    - Set to **Public** (required for Render free tier)
    - **DO NOT** initialize with README (we already have one)
@@ -15,7 +15,7 @@
 
 ```bash
 # Add GitHub remote (replace YOUR_USERNAME with your GitHub username)
-git remote add origin https://github.com/YOUR_USERNAME/text-to-cad-architecture.git
+git remote add origin https://github.com/YOUR_USERNAME/Draedon.git
 
 # Push to GitHub
 git branch -M main

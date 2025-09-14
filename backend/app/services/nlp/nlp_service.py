@@ -2,12 +2,13 @@
 NLP Processing Service for architectural text understanding.
 """
 
-import spacy
+# import spacy  # Commented out for deployment
 from typing import Dict, List, Any, Optional
 import re
 from datetime import datetime
 import structlog
-from transformers import pipeline
+# from transformers import pipeline  # Commented out for deployment
+import nltk
 
 from app.core.config import settings
 from app.utils.cache import CacheDecorator
@@ -32,20 +33,20 @@ class NLPService:
         Initialize NLP models and resources.
         """
         try:
-            # Load spaCy model
-            self.nlp = spacy.load(settings.SPACY_MODEL)
+            # Simplified NLP for deployment - using NLTK instead of spaCy
+            # self.nlp = spacy.load(settings.SPACY_MODEL)
 
-            # Add custom entity ruler
-            ruler = self.nlp.add_pipe("entity_ruler", before="ner")
-            ruler.add_patterns(self.entity_patterns)
+            # Download required NLTK data
+            try:
+                nltk.download('punkt', quiet=True)
+                nltk.download('stopwords', quiet=True)
+            except:
+                pass  # Ignore download errors in production
 
-            # Load intent classifier
-            self.classifier = pipeline(
-                "zero-shot-classification",
-                model="facebook/bart-large-mnli"
-            )
+            self.nlp = None  # Will use simple regex-based processing
+            self.classifier = None  # Will use simple keyword classification
 
-            logger.info("NLP service initialized successfully")
+            logger.info("NLP service initialized successfully (simplified mode)")
 
         except Exception as e:
             logger.error("Failed to initialize NLP service", error=str(e))
@@ -149,20 +150,20 @@ class NLPService:
         start_time = datetime.utcnow()
 
         try:
-            # Parse text with spaCy
-            doc = self.nlp(text)
+            # Simplified processing without spaCy
+            # doc = self.nlp(text)
 
-            # Extract entities
+            # Extract entities using simple keyword matching
             entities = await self.extract_entities(text)
 
             # Extract dimensions
             dimensions = self._extract_dimensions(text)
 
-            # Classify intent
+            # Classify intent using simple keywords
             intent = await self.classify_intent(text)
 
-            # Extract constraints
-            constraints = self._extract_constraints(doc, entities)
+            # Extract constraints using basic patterns
+            constraints = self._extract_constraints_simple(text, entities)
 
             # Validate against building codes
             validation = await self.validate_constraints(entities, context.get("building_type", "general") if context else "general")
@@ -186,45 +187,64 @@ class NLPService:
 
     async def extract_entities(self, text: str) -> List[Dict[str, Any]]:
         """
-        Extract architectural entities from text.
+        Extract architectural entities from text using simple keyword matching.
         """
-        doc = self.nlp(text)
         entities = []
+        text_lower = text.lower()
 
-        for ent in doc.ents:
-            entity = {
-                "type": ent.label_,
-                "value": ent.text.lower(),
-                "start": ent.start_char,
-                "end": ent.end_char,
-                "confidence": 0.95  # Placeholder confidence
-            }
+        # Simple entity extraction using keyword patterns
+        entity_keywords = {
+            "BUILDING_ELEMENT": ["wall", "door", "window", "roof", "floor", "column", "beam"],
+            "SPACE": ["room", "office", "bathroom", "kitchen", "bedroom", "living room", "hallway"],
+            "MATERIAL": ["concrete", "steel", "wood", "glass", "brick", "stone"],
+            "LOCATION": ["north", "south", "east", "west", "center", "corner"]
+        }
 
-            # Extract associated dimensions if present
-            dimensions = self._extract_entity_dimensions(text[max(0, ent.start_char - 20):min(len(text), ent.end_char + 20)])
-            if dimensions:
-                entity["dimensions"] = dimensions
+        for entity_type, keywords in entity_keywords.items():
+            for keyword in keywords:
+                if keyword in text_lower:
+                    start_pos = text_lower.find(keyword)
+                    entity = {
+                        "type": entity_type,
+                        "value": keyword,
+                        "start": start_pos,
+                        "end": start_pos + len(keyword),
+                        "confidence": 0.9
+                    }
 
-            # Extract quantity
-            quantity = self._extract_quantity(text[max(0, ent.start_char - 10):ent.start_char])
-            if quantity:
-                entity["quantity"] = quantity
+                    # Extract associated dimensions if present
+                    dimensions = self._extract_entity_dimensions(text[max(0, start_pos - 20):min(len(text), start_pos + len(keyword) + 20)])
+                    if dimensions:
+                        entity["dimensions"] = dimensions
 
-            entities.append(entity)
+                    # Extract quantity
+                    quantity = self._extract_quantity(text[max(0, start_pos - 10):start_pos])
+                    if quantity:
+                        entity["quantity"] = quantity
+
+                    entities.append(entity)
 
         return entities
 
     async def classify_intent(self, text: str) -> Dict[str, Any]:
         """
-        Classify user intent from text.
+        Classify user intent from text using simple keyword matching.
         """
-        candidate_labels = ["CREATE", "MODIFY", "REMOVE", "QUERY"]
+        text_lower = text.lower()
 
-        # Use transformer model for classification
-        result = self.classifier(text, candidate_labels)
-
-        intent = result["labels"][0]
-        confidence = result["scores"][0]
+        # Simple intent classification using keywords
+        if any(word in text_lower for word in ["create", "build", "design", "make", "generate"]):
+            intent = "CREATE"
+            confidence = 0.9
+        elif any(word in text_lower for word in ["modify", "change", "update", "edit", "alter"]):
+            intent = "MODIFY"
+            confidence = 0.8
+        elif any(word in text_lower for word in ["remove", "delete", "eliminate"]):
+            intent = "REMOVE"
+            confidence = 0.8
+        else:
+            intent = "CREATE"  # Default to create for architectural descriptions
+            confidence = 0.7
 
         # Determine sub-intent based on keywords
         sub_intent = self._determine_sub_intent(text, intent)
@@ -357,6 +377,33 @@ class NLPService:
                     "description": f"{token.head.text} {token.text} {' '.join([child.text for child in token.children])}"
                 }
                 constraints.append(constraint)
+
+        return constraints
+
+    def _extract_constraints_simple(self, text: str, entities: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        Extract spatial and structural constraints using simple patterns.
+        """
+        constraints = []
+        text_lower = text.lower()
+
+        # Simple spatial relationship patterns
+        spatial_patterns = {
+            "adjacent": ["next to", "beside", "adjacent to"],
+            "inside": ["in", "inside", "within"],
+            "on": ["on", "above", "on top of"],
+            "near": ["near", "close to", "around"]
+        }
+
+        for relationship, keywords in spatial_patterns.items():
+            for keyword in keywords:
+                if keyword in text_lower:
+                    constraint = {
+                        "type": "spatial",
+                        "relationship": relationship,
+                        "description": f"Elements have {relationship} relationship"
+                    }
+                    constraints.append(constraint)
 
         return constraints
 

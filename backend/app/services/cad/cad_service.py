@@ -10,11 +10,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 import trimesh
-from OCC.Core import gp_Pnt, gp_Vec, gp_Dir, gp_Ax1, gp_Ax2, gp_Trsf
-from OCC.Core import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
-from OCC.Core import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut
-from OCC.Core import STEPCADApi_Writer, IGESCADApi_Writer
-from OCC.Core import StlAPI_Writer
+# OpenCASCADE imports commented out for initial deployment
+# from OCC.Core import gp_Pnt, gp_Vec, gp_Dir, gp_Ax1, gp_Ax2, gp_Trsf
+# from OCC.Core import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
+# from OCC.Core import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut
+# from OCC.Core import STEPCADApi_Writer, IGESCADApi_Writer
+# from OCC.Core import StlAPI_Writer
 import structlog
 
 logger = structlog.get_logger()
@@ -53,10 +54,10 @@ class CADService:
     def _test_opencascade(self):
         """Test OpenCASCADE functionality."""
         try:
-            # Simple test - create a box
-            box = BRepPrimAPI_MakeBox(10, 10, 10).Shape()
-            self.opencascade_loaded = True
-            logger.info("OpenCASCADE loaded successfully")
+            # OpenCASCADE temporarily disabled for deployment
+            # box = BRepPrimAPI_MakeBox(10, 10, 10).Shape()
+            self.opencascade_loaded = False
+            logger.info("Using Trimesh for CAD operations (OpenCASCADE disabled for deployment)")
         except Exception as e:
             logger.warning("OpenCASCADE not available, falling back to Trimesh", error=str(e))
             self.opencascade_loaded = False

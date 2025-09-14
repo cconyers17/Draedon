@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app:*)",
+      "Bash(npm install:*)",
+      "Read(//c/Users/noell/**)",
+      "Bash(npm run dev:*)",
+      "Bash(dir:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run lint)",
+      "Bash(python -m pytest --version)",
+      "Bash(npx tsc:*)",
+      "Bash(python:*)",
+      "Bash(npm run build:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git reset:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

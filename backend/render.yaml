@@ -1,0 +1,87 @@
+# Render.com deployment configuration
+# Infrastructure as Code for Text-to-CAD API
+
+services:
+  # Main FastAPI application
+  - type: web
+    name: text-to-cad-api
+    runtime: python
+    region: oregon
+    plan: standard  # Upgrade to pro for production
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -m spacy download en_core_web_lg
+    startCommand: |
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: PORT
+        value: 8000
+      - key: RENDER
+        value: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: text-to-cad-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: text-to-cad-cache
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SENTRY_DSN
+        sync: false  # Add manually for error tracking
+      - key: AWS_ACCESS_KEY_ID
+        sync: false  # Add manually for S3
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false  # Add manually for S3
+      - key: MESHY_API_KEY
+        sync: false  # Add manually
+      - key: TRELLIS_API_KEY
+        sync: false  # Add manually
+      - key: RODIN_API_KEY
+        sync: false  # Add manually
+    healthCheckPath: /health
+    autoDeploy: true  # Auto deploy on push to main branch
+
+  # Background worker for async tasks
+  - type: worker
+    name: text-to-cad-worker
+    runtime: python
+    region: oregon
+    plan: starter
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: |
+      celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: text-to-cad-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: text-to-cad-cache
+          property: connectionString
+
+databases:
+  # PostgreSQL database
+  - name: text-to-cad-db
+    plan: standard  # 1GB RAM, 10GB storage
+    region: oregon
+    databaseName: text_to_cad
+    user: text_to_cad_user
+    postgresMajorVersion: 15
+    ipAllowList: []  # Allow connections from Render services only
+
+# Redis is not directly configurable in render.yaml
+# Must be created separately through Render dashboard
+# Service name: text-to-cad-cache
+# Plan: starter (0.5GB RAM, 25 connections)

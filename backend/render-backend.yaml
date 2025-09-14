@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: text-to-cad-backend
+    runtime: python
+    plan: starter # or starter for free tier
+    region: oregon # Choose appropriate region
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+      python -c "import nltk; nltk.download('punkt')"
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+      - key: DATABASE_URL
+        generateValue: true
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: text-to-cad-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: RENDER
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "https://text-to-cad-frontend.onrender.com,http://localhost:3000"
+      - key: SPACY_MODEL
+        value: "en_core_web_sm"
+      - key: NLP_CACHE_TTL
+        value: "3600"
+      - key: MAX_FILE_SIZE
+        value: "104857600" # 100MB
+      - key: SENTRY_DSN
+        value: "" # Add if using Sentry
+
+    # Auto-deploy from main branch
+    autoDeploy: false # Set to true for auto-deploy
+
+  # PostgreSQL Database
+  - type: pserv
+    name: text-to-cad-db
+    plan: starter # Free tier
+    region: oregon
+    env: python
+    diskGB: 1
+
+  # Redis Cache
+  - type: redis
+    name: text-to-cad-redis
+    plan: starter # Free tier
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+
+# Instructions for deployment:
+# 1. Create a new Web Service on Render
+# 2. Connect your GitHub repository
+# 3. Use the following settings:
+#    - Runtime: Python 3
+#    - Build Command: pip install --upgrade pip && pip install -r requirements.txt
+#    - Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+#    - Root Directory: backend
+# 4. Add environment variables as specified above
+# 5. Create PostgreSQL and Redis services
+# 6. Connect the database and Redis URLs to the web service

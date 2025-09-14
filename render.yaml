@@ -1,0 +1,160 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: text-to-cad-postgres
+    env: docker
+    plan: starter
+    dockerfilePath: ./database/postgres/Dockerfile
+    dockerContext: ./database/postgres
+    envVars:
+      - key: POSTGRES_DB
+        value: textcad_production
+      - key: POSTGRES_USER
+        value: textcad_user
+      - key: POSTGRES_PASSWORD
+        generateValue: true
+    disk:
+      name: postgres-data
+      sizeGB: 10
+      mountPath: /var/lib/postgresql/data
+
+  # Redis Cache
+  - type: redis
+    name: text-to-cad-redis
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+  # FastAPI Backend
+  - type: webservice
+    name: text-to-cad-backend
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    numInstances: 2
+    preDeployCommand: |
+      python -m alembic upgrade head &&
+      python scripts/init_db.py
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: text-to-cad-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: text-to-cad-redis
+          property: connectionString
+      - key: CORS_ORIGINS
+        value: "https://text-to-cad-frontend.onrender.com"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MESHY_AI_API_KEY
+        sync: false
+      - key: TRELLIS_3D_API_KEY
+        sync: false
+      - key: RODIN_AI_API_KEY
+        sync: false
+      - key: OPENCASCADE_WASM_PATH
+        value: "/app/static/opencascade"
+      - key: MAX_WORKERS
+        value: "4"
+      - key: WORKER_TIMEOUT
+        value: "300"
+      - key: LOG_LEVEL
+        value: "INFO"
+    scaling:
+      minInstances: 1
+      maxInstances: 10
+      targetMemoryPercent: 70
+      targetCPUPercent: 70
+    buildCommand: |
+      pip install --upgrade pip &&
+      pip install -r requirements.txt &&
+      pip install gunicorn[gevent]
+    startCommand: |
+      gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:10000 --timeout 300 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100
+
+  # Next.js Frontend
+  - type: webservice
+    name: text-to-cad-frontend
+    env: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./text-to-cad-app/Dockerfile
+    dockerContext: ./text-to-cad-app
+    healthCheckPath: /api/health
+    numInstances: 2
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: webservice
+          name: text-to-cad-backend
+          property: host
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: PORT
+        value: "3000"
+      - key: HOSTNAME
+        value: "0.0.0.0"
+    scaling:
+      minInstances: 1
+      maxInstances: 8
+      targetMemoryPercent: 80
+      targetCPUPercent: 80
+    buildCommand: |
+      npm ci --only=production &&
+      npm run build
+    startCommand: npm start
+
+  # Static File CDN Service
+  - type: static
+    name: text-to-cad-assets
+    staticPublishPath: ./text-to-cad-app/public
+    pullRequestPreviewsEnabled: false
+    buildCommand: echo "Static assets ready"
+    headers:
+      - path: "/**"
+        key: "Cache-Control"
+        value: "public, max-age=31536000, immutable"
+      - path: "/*.wasm"
+        key: "Content-Type"
+        value: "application/wasm"
+      - path: "/*.js"
+        key: "Content-Encoding"
+        value: "gzip"
+
+# Environment-specific configurations
+environments:
+  production:
+    services:
+      - text-to-cad-postgres
+      - text-to-cad-redis
+      - text-to-cad-backend
+      - text-to-cad-frontend
+      - text-to-cad-assets
+
+  staging:
+    services:
+      - text-to-cad-postgres
+      - text-to-cad-redis
+      - text-to-cad-backend
+      - text-to-cad-frontend
+
+# Global settings
+settings:
+  autoDeploy: true
+  buildCommand: echo "Multi-service deployment"
+  previewsEnabled: true
+  preBuildCommand: |
+    echo "Preparing deployment environment..."
+    mkdir -p logs
+    echo "Environment setup complete"

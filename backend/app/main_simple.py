@@ -5,14 +5,13 @@ Simplified FastAPI application for Render deployment.
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import structlog
+import logging
 
 from app.core.simple_config import settings
 
 # Configure basic logging
-import logging
 logging.basicConfig(level=logging.INFO)
-logger = structlog.get_logger()
+logger = logging.getLogger(__name__)
 
 
 # Create FastAPI application
@@ -98,7 +97,7 @@ async def process_text(request: Request):
         return result
 
     except Exception as e:
-        logger.error("Text processing failed", error=str(e))
+        logger.error(f"Text processing failed: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"error": "Text processing failed", "message": str(e)}
@@ -159,7 +158,7 @@ async def generate_cad(request: Request):
         return model
 
     except Exception as e:
-        logger.error("CAD generation failed", error=str(e))
+        logger.error(f"CAD generation failed: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"error": "CAD generation failed", "message": str(e)}
@@ -193,12 +192,7 @@ async def get_model(model_id: str):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled errors."""
-    logger.error(
-        "Unhandled exception",
-        path=str(request.url.path),
-        method=request.method,
-        error=str(exc)
-    )
+    logger.error(f"Unhandled exception: {str(exc)} - Path: {request.url.path} - Method: {request.method}")
     return JSONResponse(
         status_code=500,
         content={

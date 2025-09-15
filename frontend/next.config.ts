@@ -3,11 +3,10 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   reactStrictMode: true,
-  swcMinify: true,
 
   // Enable experimental features for better performance
   experimental: {
-    optimizePackageImports: ['@react-three/drei', '@react-three/fiber'],
+    optimizePackageImports: ['three'],
   },
 
   // WebAssembly support for OpenCASCADE.js
